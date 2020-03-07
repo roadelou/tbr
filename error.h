@@ -6,15 +6,15 @@
 #define ERROR_MSG_SIZE 128
 #endif
 
-#include <string.h>
-#include <stdio.h>	// to get error stack
 #include <stdarg.h> // for vsnprintf
+#include <stdio.h>  // to get error stack
+#include <string.h>
 
 typedef struct Error Error;
 
 struct Error {
-	char code;
-	char msg[ERROR_MSG_SIZE];
+  char code;
+  char msg[ERROR_MSG_SIZE];
 };
 
 extern Error error(const int code, const char *msg);

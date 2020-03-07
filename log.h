@@ -5,13 +5,13 @@
 #define LOG_MSG_SIZE 128
 #endif
 
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 enum LOG {
-	LOW,	// 0
-	MED,	// 1
-	HIGH	// 2
+  LOW, // 0
+  MED, // 1
+  HIGH // 2
 };
 
 int loglvl(const enum LOG threshold);

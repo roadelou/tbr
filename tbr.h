@@ -13,30 +13,33 @@
 #define TBR_MAX_DEP 16
 #endif
 
-// Define maximum total amount of dependancies to a project, can be overriden at compile time.
+// Define maximum total amount of dependancies to a project, can be overriden at
+// compile time.
 #ifndef TBR_DICT_SIZE
 #define TBR_DICT_SIZE 128
 #endif
 
-// Define the home folder (should be done at runtime, but I am alone and I don't care).
+// Define the home folder (should be done at runtime, but I am alone and I don't
+// care).
 #ifndef TBR_HOME
 #define TBR_HOME "/home/roadelou"
 #endif
 
-#include <search.h>	// used for dict manipulations (hsearch etc...)
+#include "error.h"  // used to make erroe handling less painfull
+#include "log.h"    // used for nice log info
 #include <dirent.h> // used to check if directories exist
-#include <errno.h>	// used for errno manipulations
-#include <sys/stat.h>	// used for mkdir
-#include <sys/types.h>	// used for mkdir
-#include <string.h>
+#include <errno.h>  // used for errno manipulations
+#include <search.h> // used for dict manipulations (hsearch etc...)
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>  // used for mkdir
+#include <sys/types.h> // used for mkdir
 #include <unistd.h>
-#include "error.h"	// used to make erroe handling less painfull
-#include "log.h"	// used for nice log info
 
 /*
-IMPORTANT : at runtime, in order to avoid including twice the same dependancy we use a global hash table created with hcreate.
+IMPORTANT : at runtime, in order to avoid including twice the same dependancy we
+use a global hash table created with hcreate.
 */
 typedef struct Dependancy Dependancy;
 typedef struct Project Project;
@@ -48,7 +51,7 @@ struct Dependancy {
 struct Project {
   char name[TBR_STR_SIZE];
   char path[TBR_STR_SIZE];
-  size_t count;	// The number of elements in deps
+  size_t count; // The number of elements in deps
   Dependancy deps[TBR_MAX_DEP];
 };
 
@@ -58,7 +61,8 @@ extern Error nproj(Project *p, const char *name);
 extern Error rproj(Project *p, const char *path);
 // Builds the project in the current working directory
 extern Error make(void);
-// dep is a single dependancy, whose tbr file will be read and used to complete p in order to make the necessay inclusions.
+// dep is a single dependancy, whose tbr file will be read and used to complete
+// p in order to make the necessay inclusions.
 extern Error getdeps(Project *p, const Dependancy d);
 // Includes a single dependancy into the project
 extern Error include(const Dependancy d);

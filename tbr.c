@@ -7,419 +7,422 @@ Error fcopy(const char *src, const char *dest);
 Error make_recur(const Dependancy d);
 
 Error nproj(Project *p, const char *name) {
-    char cwd_buffer[TBR_STR_SIZE];
-    char *cwd_ptr = getcwd(cwd_buffer, TBR_STR_SIZE);
-    if (cwd_ptr == NULL) {
-      	return error(-1, "Current path too long");
-    }
-	strncpy(p->name, name, TBR_STR_SIZE);
-    snprintf(p->path, TBR_STR_SIZE, "%s/%s", cwd_ptr, p->name);
-    
-    int exists = dir_exists(p->path);
-	if (exists == 1) {
-		return errorf(-1, "Project folder %s already exists", p->path);
-	}
-	
-	mlog("Creating project %s\n", p->name);
-	
-	// else ...
-	int created_dir = mkdir(p->path, 0777);
-	if (created_dir == -1) {
-		return errorf(-1, "Path %s could not be created", p->path);
-	}
+  char cwd_buffer[TBR_STR_SIZE];
+  char *cwd_ptr = getcwd(cwd_buffer, TBR_STR_SIZE);
+  if (cwd_ptr == NULL) {
+    return error(-1, "Current path too long");
+  }
+  strncpy(p->name, name, TBR_STR_SIZE);
+  snprintf(p->path, TBR_STR_SIZE, "%s/%s", cwd_ptr, p->name);
 
-	int changed_dir = chdir(p->path);
-	if (changed_dir == -1) {
-		return errorf(-1, "Could not enter directory %s", p->path);
-	}
+  int exists = dir_exists(p->path);
+  if (exists == 1) {
+    return errorf(-1, "Project folder %s already exists", p->path);
+  }
 
-	char *makefile_format = "# Makefile generated automatically by the tbr tool.\n"
-	"NAME = %s\n"
-	"# All the dependancies of the project. To modify those dependancies edit the %s.tbr file and let the tool do the hard work.\n"
-	"DEP = $(wildcard ./.dep/*.v)\n"
-	"# The file that the tbr tool uses to manage your projects. Edit it to add or remove a dependancy.\n"
-	"TBR = ./$(NAME).tbr\n"
-	"SRC = $(NAME).v\n"
-	"# The top module, used to test your implementation with verilator.\n"
-	"TOP = top.v\n"
-	"# The global location where all librairies are stored, used by the tbr tool to gather the dependancies of your project.\n"
-	"LIB = %s/.tbr\n"
-	"\n"
-	"top: $(SRC) deps $(TOP)\n"
-	"\tiverilog -o top $(SRC) $(DEP) $(TOP)\n"
-	"\n"
-	"# Asks the tbr tool to gather the dependancies of your project.\n"
-	"deps: $(TBR)\n"
-	"\ttbr build\n"
-	"\n"
-	"# Creates a usable librairy from the current project\n"
-	"install: $(SRC) $(TBR)\n"
-	"\trm -rf $(LIB)/$(NAME)\n"
-	"\tmkdir $(LIB)/$(NAME)\n"
-	"\tcp $(SRC) $(LIB)/$(NAME)/\n"
-    "\tcp $(TBR) $(LIB)/$(NAME)/\n"
-	"\n"
-	"clean:\n"
-	"\ttbr clean\n"
-	"\trm -f top\n"
-	"\n";
+  mlog("Creating project %s\n", p->name);
 
-	char makefile_buffer[1024];
-	snprintf(makefile_buffer, 1024, makefile_format, p->name, p->name, TBR_HOME);
-	Error makefile_written = write_file("Makefile", makefile_buffer);
-	if (makefile_written.code == -1) {
-		return error(-1, "Could not write Makefile");
-	}
-	// else ...
-	llog("Added Makefile to project %s\n", p->name);
-	
-	char *top_template = "// top module created automatically by the tbr tool.\n"
-	"\n"
-	"module Top;\n"
-	"// Because of how icarus verilog works this top file must not have inputs or outputs (it is a simulation file).\n"
-	"\n"
-	"endmodule\n";
+  // else ...
+  int created_dir = mkdir(p->path, 0777);
+  if (created_dir == -1) {
+    return errorf(-1, "Path %s could not be created", p->path);
+  }
 
-	Error top_written = write_file("top.v", top_template);
-	if (top_written.code == -1) {
-		return error(-1, "Could not write top.v file");
-	}
-	llog("Added top module to project %s\n", p->name);
-	
-	char *dep_template = "# This files contains the dependancies that the tbr tool will look for.\n"
-	"# Any line beginning with a '#' will be ignored.\n"
-	"\n";
+  int changed_dir = chdir(p->path);
+  if (changed_dir == -1) {
+    return errorf(-1, "Could not enter directory %s", p->path);
+  }
 
-	char dep_file_name[TBR_STR_SIZE];
-	snprintf(dep_file_name, TBR_STR_SIZE, "%s.tbr", p->name); 
-	
-	Error dep_written = write_file(dep_file_name, dep_template);
-	if (dep_written.code == -1) {
-		return errorf(-1, "Could not write %s file", dep_file_name);
-	}
-	llog("Added tbr file to project %s\n", p->name);
+  char *makefile_format =
+      "# Makefile generated automatically by the tbr tool.\n"
+      "NAME = %s\n"
+      "# All the dependancies of the project. To modify those dependancies "
+      "edit the %s.tbr file and let the tool do the hard work.\n"
+      "DEP = $(wildcard ./.dep/*.v)\n"
+      "# The file that the tbr tool uses to manage your projects. Edit it to "
+      "add or remove a dependancy.\n"
+      "TBR = ./$(NAME).tbr\n"
+      "SRC = $(NAME).v\n"
+      "# The top module, used to test your implementation with verilator.\n"
+      "TOP = top.v\n"
+      "# The global location where all librairies are stored, used by the tbr "
+      "tool to gather the dependancies of your project.\n"
+      "LIB = %s/.tbr\n"
+      "\n"
+      "top: $(SRC) deps $(TOP)\n"
+      "\tiverilog -o top $(SRC) $(DEP) $(TOP)\n"
+      "\n"
+      "# Asks the tbr tool to gather the dependancies of your project.\n"
+      "deps: $(TBR)\n"
+      "\ttbr build\n"
+      "\n"
+      "# Creates a usable librairy from the current project\n"
+      "install: $(SRC) $(TBR)\n"
+      "\trm -rf $(LIB)/$(NAME)\n"
+      "\tmkdir $(LIB)/$(NAME)\n"
+      "\tcp $(SRC) $(LIB)/$(NAME)/\n"
+      "\tcp $(TBR) $(LIB)/$(NAME)/\n"
+      "\n"
+      "clean:\n"
+      "\ttbr clean\n"
+      "\trm -f top\n"
+      "\n";
 
-	char *verilog_template = "// This file was automatically generated by the tbr tool.\n"
-	"// You can put your verilog source code inside of this file.\n"
-	"\n";
-	
-	char verilog_file[TBR_STR_SIZE];
-	snprintf(verilog_file, TBR_STR_SIZE, "%s.v", p->name);
-	Error verilog_written = write_file(verilog_file, verilog_template);
-	if (verilog_written.code == -1) {
-		return errorf(-1, "Could not source file %s", verilog_file);
-	}
-	llog("Added verilog empty file to project %s\n", p->name);
-	
-	int created_dep_dir = mkdir(".dep", 0777);
-	if (created_dep_dir == -1) {
-		return error(-1, "Could not create .dep folder");
-	}
-	llog("Added dependancy folder to project %s\n", p->name);
-	
-	p->count = 0;
-	return error(0, NULL);
+  char makefile_buffer[1024];
+  snprintf(makefile_buffer, 1024, makefile_format, p->name, p->name, TBR_HOME);
+  Error makefile_written = write_file("Makefile", makefile_buffer);
+  if (makefile_written.code == -1) {
+    return error(-1, "Could not write Makefile");
+  }
+  // else ...
+  llog("Added Makefile to project %s\n", p->name);
+
+  char *top_template =
+      "// top module created automatically by the tbr tool.\n"
+      "\n"
+      "module Top;\n"
+      "// Because of how icarus verilog works this top file must not have "
+      "inputs or outputs (it is a simulation file).\n"
+      "\n"
+      "endmodule\n";
+
+  Error top_written = write_file("top.v", top_template);
+  if (top_written.code == -1) {
+    return error(-1, "Could not write top.v file");
+  }
+  llog("Added top module to project %s\n", p->name);
+
+  char *dep_template = "# This files contains the dependancies that the tbr "
+                       "tool will look for.\n"
+                       "# Any line beginning with a '#' will be ignored.\n"
+                       "\n";
+
+  char dep_file_name[TBR_STR_SIZE];
+  snprintf(dep_file_name, TBR_STR_SIZE, "%s.tbr", p->name);
+
+  Error dep_written = write_file(dep_file_name, dep_template);
+  if (dep_written.code == -1) {
+    return errorf(-1, "Could not write %s file", dep_file_name);
+  }
+  llog("Added tbr file to project %s\n", p->name);
+
+  char *verilog_template =
+      "// This file was automatically generated by the tbr tool.\n"
+      "// You can put your verilog source code inside of this file.\n"
+      "\n";
+
+  char verilog_file[TBR_STR_SIZE];
+  snprintf(verilog_file, TBR_STR_SIZE, "%s.v", p->name);
+  Error verilog_written = write_file(verilog_file, verilog_template);
+  if (verilog_written.code == -1) {
+    return errorf(-1, "Could not source file %s", verilog_file);
+  }
+  llog("Added verilog empty file to project %s\n", p->name);
+
+  int created_dep_dir = mkdir(".dep", 0777);
+  if (created_dep_dir == -1) {
+    return error(-1, "Could not create .dep folder");
+  }
+  llog("Added dependancy folder to project %s\n", p->name);
+
+  p->count = 0;
+  return error(0, NULL);
 }
 
 int dir_exists(const char *path) {
-	DIR *dir_ptr = opendir(path);
-	if (dir_ptr) {
-		closedir(dir_ptr);
-		return 1;
-	}
-	else if (ENOENT == errno) {
-		return 0;
-	}
-	else {
-		// i.e. other error
-		return -1;
-	}
+  DIR *dir_ptr = opendir(path);
+  if (dir_ptr) {
+    closedir(dir_ptr);
+    return 1;
+  } else if (ENOENT == errno) {
+    return 0;
+  } else {
+    // i.e. other error
+    return -1;
+  }
 }
 
 Error write_file(const char *filename, const char *text) {
-	FILE *f_ptr = fopen(filename, "w");
-	if (f_ptr == NULL) {
-		return errorf(-1, "Could not create file %s", filename);
-	}
-	// else ...
-	int written = fputs(text, f_ptr);
-	if (written == EOF) {
-		return errorf(-1, "Could not write to file %s", filename);
-	}
-	// else ...
-	return error(0, NULL);
+  FILE *f_ptr = fopen(filename, "w");
+  if (f_ptr == NULL) {
+    return errorf(-1, "Could not create file %s", filename);
+  }
+  // else ...
+  int written = fputs(text, f_ptr);
+  if (written == EOF) {
+    return errorf(-1, "Could not write to file %s", filename);
+  }
+  // else ...
+  return error(0, NULL);
 }
 
 // Reads project in path specified by path. If path is null looks in cwd.
 Error rproj(Project *p, const char *path) {
-	if (path == NULL) {
-   		char cwd_buffer[TBR_STR_SIZE];
-   		char *cwd_ptr = getcwd(cwd_buffer, TBR_STR_SIZE);
-   		if (cwd_ptr == NULL) {
-   			return error(-1, "Current path too long");
-   		}
-		strncpy(p->path, cwd_ptr, TBR_STR_SIZE);
-	}
-	else {
-		strncpy(p->path, path, TBR_STR_SIZE);
-	}
-	DIR *dir_ptr = opendir(p->path);
-	if (dir_ptr == NULL) {
-		return errorf(-1, "Could not open directory %s", p->path);
-	}
-	// else ...
-	
-	// Looking for a file that ends in .tbr in the cwd. First match is considered to be the roght one.
-	struct dirent *ent;
-	int found_tbr = 0;
-	while ((ent = readdir(dir_ptr)) != NULL) {
-		size_t filename_len = strlen(ent->d_name);
-		int comparison = strncmp(ent->d_name + (filename_len - 4), ".tbr", 4);
-		if (comparison == 0) {
-			found_tbr = 1;
-			size_t cpy_size = filename_len - 4;
-			if (cpy_size + 1> TBR_STR_SIZE) {
-				return errorf(-1, "Project name %s too long", ent->d_name);
-			}
-			// else ...
-			strncpy(p->name, ent->d_name, cpy_size);
-			p->name[cpy_size] = '\0';	// null termination byte
-			break;
-		}
-	}
-	if (!found_tbr) {
-		// Could mean that we are looking at a project with no dependancies.
-		return error(-3, "Could not find project file");
-	}
-	closedir(dir_ptr);
-	
-	mlog("Successfully read project %s\n", p->name);
+  if (path == NULL) {
+    char cwd_buffer[TBR_STR_SIZE];
+    char *cwd_ptr = getcwd(cwd_buffer, TBR_STR_SIZE);
+    if (cwd_ptr == NULL) {
+      return error(-1, "Current path too long");
+    }
+    strncpy(p->path, cwd_ptr, TBR_STR_SIZE);
+  } else {
+    strncpy(p->path, path, TBR_STR_SIZE);
+  }
+  DIR *dir_ptr = opendir(p->path);
+  if (dir_ptr == NULL) {
+    return errorf(-1, "Could not open directory %s", p->path);
+  }
+  // else ...
 
-	char dep_fname[TBR_STR_SIZE];
-	snprintf(dep_fname, TBR_STR_SIZE, "%s/%s.tbr", p->path, p->name);
-	Error read_dep = read_tbr(p, dep_fname);
-	if (read_dep.code != 0) {	// Can be improved later on
-		return errorf(-1, "Could not parse %s", dep_fname);
-	}
-	return error(0, NULL);
+  // Looking for a file that ends in .tbr in the cwd. First match is considered
+  // to be the roght one.
+  struct dirent *ent;
+  int found_tbr = 0;
+  while ((ent = readdir(dir_ptr)) != NULL) {
+    size_t filename_len = strlen(ent->d_name);
+    int comparison = strncmp(ent->d_name + (filename_len - 4), ".tbr", 4);
+    if (comparison == 0) {
+      found_tbr = 1;
+      size_t cpy_size = filename_len - 4;
+      if (cpy_size + 1 > TBR_STR_SIZE) {
+        return errorf(-1, "Project name %s too long", ent->d_name);
+      }
+      // else ...
+      strncpy(p->name, ent->d_name, cpy_size);
+      p->name[cpy_size] = '\0'; // null termination byte
+      break;
+    }
+  }
+  if (!found_tbr) {
+    // Could mean that we are looking at a project with no dependancies.
+    return error(-3, "Could not find project file");
+  }
+  closedir(dir_ptr);
+
+  mlog("Successfully read project %s\n", p->name);
+
+  char dep_fname[TBR_STR_SIZE];
+  snprintf(dep_fname, TBR_STR_SIZE, "%s/%s.tbr", p->path, p->name);
+  Error read_dep = read_tbr(p, dep_fname);
+  if (read_dep.code != 0) { // Can be improved later on
+    return errorf(-1, "Could not parse %s", dep_fname);
+  }
+  return error(0, NULL);
 }
 
-
 Error read_tbr(Project *p, const char *filename) {
-	// The index used to iterate over deps
-	p->count = 0;
-	FILE *fd = fopen(filename, "r");
-	if (fd == NULL) {
-		return errorf(-1, "Could not open dependancy file %s", filename);
-	}
-	// else ...
-	
-	// using getline to read the file line by line
-	char *line_ptr = NULL;
-	size_t n = 0;
-	ssize_t gotten;
-	// Used to count the amount of dependacies that do not fit past limit, in order to help the main find the right allocation size in one pass.
-	size_t excess = 0;
-	while ((gotten = getline(&line_ptr, &n, fd)) != -1) {
-		if ((line_ptr[0] == '#') || (line_ptr[0] == '\n')){
-			// Line was commented out or is empty
-			continue;
-		}
-		else if (p->count + 1 == TBR_MAX_DEP) {
-			excess++;
-			continue;
-		}
-		// else ...
-		
-		// To remove trailing newlines
-		sscanf(line_ptr, "%s\n", p->deps[p->count].name);
-		p->count++;
-	}
-	if (excess) {	// i.e. excess != 0
-		return errorf(-2, "%ld excessive dep for the tool", excess);
-	}
-	fclose(fd);
-	free(line_ptr);
-	return error(0, NULL);
+  // The index used to iterate over deps
+  p->count = 0;
+  FILE *fd = fopen(filename, "r");
+  if (fd == NULL) {
+    return errorf(-1, "Could not open dependancy file %s", filename);
+  }
+  // else ...
+
+  // using getline to read the file line by line
+  char *line_ptr = NULL;
+  size_t n = 0;
+  ssize_t gotten;
+  // Used to count the amount of dependacies that do not fit past limit, in
+  // order to help the main find the right allocation size in one pass.
+  size_t excess = 0;
+  while ((gotten = getline(&line_ptr, &n, fd)) != -1) {
+    if ((line_ptr[0] == '#') || (line_ptr[0] == '\n')) {
+      // Line was commented out or is empty
+      continue;
+    } else if (p->count + 1 == TBR_MAX_DEP) {
+      excess++;
+      continue;
+    }
+    // else ...
+
+    // To remove trailing newlines
+    sscanf(line_ptr, "%s\n", p->deps[p->count].name);
+    p->count++;
+  }
+  if (excess) { // i.e. excess != 0
+    return errorf(-2, "%ld excessive dep for the tool", excess);
+  }
+  fclose(fd);
+  free(line_ptr);
+  return error(0, NULL);
 }
 
 Error include(const Dependancy d) {
-	ENTRY dep_entry;
-	dep_entry.key = (char *) d.name;
-	dep_entry.data = NULL;
-	ENTRY *found = hsearch(dep_entry, FIND);
-	if (found != NULL) {
-		// Nothing to do, the dependancy is already included.
-		return error(0, NULL);
-	}
-	// else ...
-	char *depfolder = "./.dep";
-	char libpath[TBR_STR_SIZE];
-	snprintf(libpath, TBR_STR_SIZE, "%s/.tbr/%s", TBR_HOME, d.name);
-	DIR *dir_ptr = opendir(libpath);
-	if (dir_ptr == NULL) {
-		return errorf(-1, "Dependancy %s not found in repos", d.name);
-	}
-	// else ...
-	
-	// We copy all verilog files to the local .dep folder.
-	struct dirent *ent;
-	int found_verilog = 0;
-	while ((ent = readdir(dir_ptr)) != NULL) {
-		size_t filename_len = strlen(ent->d_name);
-		int comparison = strncmp(ent->d_name + (filename_len - 2), ".v", 2);
-		if (comparison == 0) {
-			found_verilog++;
-			char verilog_src[TBR_STR_SIZE];
-			snprintf(verilog_src, TBR_STR_SIZE, "%s/%s", libpath, ent->d_name);
-			char verilog_dest[TBR_STR_SIZE];
-			snprintf(verilog_dest, TBR_STR_SIZE, "%s/%s", depfolder, ent->d_name);
-			Error cpy_error = fcopy(verilog_src, verilog_dest);
-			if (cpy_error.code == -1) {
-				return errorf(-1, "Could not copy source file %s", ent->d_name);
-			}
-		}
-	}
-	if (found_verilog == 0) {
-		return error(-1, "No source found in dep folder");
-	}
-	closedir(dir_ptr);
+  ENTRY dep_entry;
+  dep_entry.key = (char *)d.name;
+  dep_entry.data = NULL;
+  ENTRY *found = hsearch(dep_entry, FIND);
+  if (found != NULL) {
+    // Nothing to do, the dependancy is already included.
+    return error(0, NULL);
+  }
+  // else ...
+  char *depfolder = "./.dep";
+  char libpath[TBR_STR_SIZE];
+  snprintf(libpath, TBR_STR_SIZE, "%s/.tbr/%s", TBR_HOME, d.name);
+  DIR *dir_ptr = opendir(libpath);
+  if (dir_ptr == NULL) {
+    return errorf(-1, "Dependancy %s not found in repos", d.name);
+  }
+  // else ...
 
-	// updating dependancy dict
-	hsearch(dep_entry, ENTER);
+  // We copy all verilog files to the local .dep folder.
+  struct dirent *ent;
+  int found_verilog = 0;
+  while ((ent = readdir(dir_ptr)) != NULL) {
+    size_t filename_len = strlen(ent->d_name);
+    int comparison = strncmp(ent->d_name + (filename_len - 2), ".v", 2);
+    if (comparison == 0) {
+      found_verilog++;
+      char verilog_src[TBR_STR_SIZE];
+      snprintf(verilog_src, TBR_STR_SIZE, "%s/%s", libpath, ent->d_name);
+      char verilog_dest[TBR_STR_SIZE];
+      snprintf(verilog_dest, TBR_STR_SIZE, "%s/%s", depfolder, ent->d_name);
+      Error cpy_error = fcopy(verilog_src, verilog_dest);
+      if (cpy_error.code == -1) {
+        return errorf(-1, "Could not copy source file %s", ent->d_name);
+      }
+    }
+  }
+  if (found_verilog == 0) {
+    return error(-1, "No source found in dep folder");
+  }
+  closedir(dir_ptr);
 
-	mlog("Included %s\n", d.name);
+  // updating dependancy dict
+  hsearch(dep_entry, ENTER);
 
-	return error(0, NULL);
+  mlog("Included %s\n", d.name);
+
+  return error(0, NULL);
 }
-
 
 Error fcopy(const char *src, const char *dest) {
-	FILE *source = fopen(src, "rb");
-	if (source == NULL) {
-		return errorf(-1, "Could not open source file %s", src);
-	}
-	// else ...
-	int seeked = fseek(source, 0, SEEK_END);
-	if (seeked == -1) {
-		return errorf(-1, "Could not seek end of file %s", src);
-	}
-	size_t file_size = ftell(source);
-	rewind(source);
-	
-	FILE *destination = fopen(dest, "wb");
-	if (destination == NULL) {
-		return errorf(-1, "Could not open destination file %s", dest);	
-	}
-	// else ...
+  FILE *source = fopen(src, "rb");
+  if (source == NULL) {
+    return errorf(-1, "Could not open source file %s", src);
+  }
+  // else ...
+  int seeked = fseek(source, 0, SEEK_END);
+  if (seeked == -1) {
+    return errorf(-1, "Could not seek end of file %s", src);
+  }
+  size_t file_size = ftell(source);
+  rewind(source);
 
-	// allocating memory needed to transer the file in one pass (could be improved later on.	
-	void *buffer = malloc(file_size);
-	size_t read_src = fread(buffer, 1, file_size, source);
-	if (read_src != file_size) {
-		return errorf(-1, "Could not read from file %s", src);
-	}
-	// else ...
-	size_t write_dest = fwrite(buffer, 1, file_size, destination);
-	fclose(source);
-	if (write_dest != file_size) {
-		return errorf(-1, "Could not write to file %s", dest);
-	}
-	// else ...
-	fclose(destination);
-	return error(0, NULL);
+  FILE *destination = fopen(dest, "wb");
+  if (destination == NULL) {
+    return errorf(-1, "Could not open destination file %s", dest);
+  }
+  // else ...
+
+  // allocating memory needed to transer the file in one pass (could be improved
+  // later on.
+  void *buffer = malloc(file_size);
+  size_t read_src = fread(buffer, 1, file_size, source);
+  if (read_src != file_size) {
+    return errorf(-1, "Could not read from file %s", src);
+  }
+  // else ...
+  size_t write_dest = fwrite(buffer, 1, file_size, destination);
+  fclose(source);
+  if (write_dest != file_size) {
+    return errorf(-1, "Could not write to file %s", dest);
+  }
+  // else ...
+  fclose(destination);
+  return error(0, NULL);
 }
 
-
 Error getdeps(Project *p, const Dependancy d) {
-	char dep_path[TBR_STR_SIZE];
-	snprintf(dep_path, TBR_STR_SIZE, "%s/.tbr/%s", TBR_HOME, d.name);
-	Error read_error = rproj(p, dep_path);
-	if ((read_error.code == 0) || (read_error.code == -3)){
-		// i.e. looking at dependancy with no other dependancy
-		return error(0, NULL);
-	}
-	else {
-		return errorf(-1, "Could not read tbr file of %s", d.name);
-	}
+  char dep_path[TBR_STR_SIZE];
+  snprintf(dep_path, TBR_STR_SIZE, "%s/.tbr/%s", TBR_HOME, d.name);
+  Error read_error = rproj(p, dep_path);
+  if ((read_error.code == 0) || (read_error.code == -3)) {
+    // i.e. looking at dependancy with no other dependancy
+    return error(0, NULL);
+  } else {
+    return errorf(-1, "Could not read tbr file of %s", d.name);
+  }
 }
 
 Error make(void) {
-	Project p;
-	Error read_root = rproj(&p, NULL);
-	if (read_root.code == -1) {
-		return error(-1, "Failed to begin recursive build");
-	}
-	
-	mlog("Building project %s\n", p.name);
-	
-	for (size_t i = 0; i < p.count; i++) {
-		Error make_err = make_recur(p.deps[i]);
-		if (make_err.code == -1) {
-			return errorf(-1, "Recursive build of %s failed", p.deps[i].name);
-		}
-	}
-	return error(0, NULL);
+  Project p;
+  Error read_root = rproj(&p, NULL);
+  if (read_root.code == -1) {
+    return error(-1, "Failed to begin recursive build");
+  }
+
+  mlog("Building project %s\n", p.name);
+
+  for (size_t i = 0; i < p.count; i++) {
+    Error make_err = make_recur(p.deps[i]);
+    if (make_err.code == -1) {
+      return errorf(-1, "Recursive build of %s failed", p.deps[i].name);
+    }
+  }
+  return error(0, NULL);
 }
 
 Error make_recur(const Dependancy d) {
-	// Note that this test is usefull to solve issues with circular dependancies
-	ENTRY dep_entry;
-	dep_entry.key = (char *) d.name;
-	dep_entry.data = NULL;
-	ENTRY *found = hsearch(dep_entry, FIND);
-	if (found != NULL) {
-		// Nothing to do, the dependancy is already included.
-		return error(0, NULL);
-	}
-	// else ...
+  // Note that this test is usefull to solve issues with circular dependancies
+  ENTRY dep_entry;
+  dep_entry.key = (char *)d.name;
+  dep_entry.data = NULL;
+  ENTRY *found = hsearch(dep_entry, FIND);
+  if (found != NULL) {
+    // Nothing to do, the dependancy is already included.
+    return error(0, NULL);
+  }
+  // else ...
 
-	Project p;
-	Error gotten_deps = getdeps(&p, d);
-	if (gotten_deps.code == -1) {
-		return errorf(-1, "Could not get build dependancies of %s", d.name);
-	}
-	// else ...
-	for (size_t i = 0; i < p.count; i++) {
-		Error make_err = make_recur(p.deps[i]);
-		if (make_err.code == -1) {
-			return errorf(-1, "Recursive build of %s failed", p.deps[i].name);
-		}
-	}
+  Project p;
+  Error gotten_deps = getdeps(&p, d);
+  if (gotten_deps.code == -1) {
+    return errorf(-1, "Could not get build dependancies of %s", d.name);
+  }
+  // else ...
+  for (size_t i = 0; i < p.count; i++) {
+    Error make_err = make_recur(p.deps[i]);
+    if (make_err.code == -1) {
+      return errorf(-1, "Recursive build of %s failed", p.deps[i].name);
+    }
+  }
 
-	Error included = include(d);
-	if (included.code == -1) {
-		return errorf(-1, "Could not include dependancy %s", d.name);
-	}
-	return error(0, NULL);
+  Error included = include(d);
+  if (included.code == -1) {
+    return errorf(-1, "Could not include dependancy %s", d.name);
+  }
+  return error(0, NULL);
 }
 
-
 extern Error clean(void) {
-	llog("%s\n", "Cleaning dependancy folder");
+  llog("%s\n", "Cleaning dependancy folder");
 
-	char *depfolder = "./.dep";
-	DIR *dir_ptr = opendir(depfolder);
-	if (dir_ptr == NULL) {
-		return errorf(-1, "Dependancy folder %s could not be opened", depfolder);
-	}
-	// else ...
-	
-	struct dirent *ent;
-	while ((ent = readdir(dir_ptr)) != NULL) {
-		size_t filename_len = strlen(ent->d_name);
-		int comparison = strncmp(ent->d_name + (filename_len - 2), ".v", 2);
-		if (comparison == 0) {
-			char fname[TBR_STR_SIZE];
-			snprintf(fname, TBR_STR_SIZE, "%s/%s", depfolder, ent->d_name);
-			int removed = remove(fname);
-			if (removed == -1) {
-				return errorf(-1, "Could not remove file %s in .dep folder", ent->d_name);
-			}
-		}
-	}
-	closedir(dir_ptr);
-	return error(0, NULL);
+  char *depfolder = "./.dep";
+  DIR *dir_ptr = opendir(depfolder);
+  if (dir_ptr == NULL) {
+    return errorf(-1, "Dependancy folder %s could not be opened", depfolder);
+  }
+  // else ...
+
+  struct dirent *ent;
+  while ((ent = readdir(dir_ptr)) != NULL) {
+    size_t filename_len = strlen(ent->d_name);
+    int comparison = strncmp(ent->d_name + (filename_len - 2), ".v", 2);
+    if (comparison == 0) {
+      char fname[TBR_STR_SIZE];
+      snprintf(fname, TBR_STR_SIZE, "%s/%s", depfolder, ent->d_name);
+      int removed = remove(fname);
+      if (removed == -1) {
+        return errorf(-1, "Could not remove file %s in .dep folder",
+                      ent->d_name);
+      }
+    }
+  }
+  closedir(dir_ptr);
+  return error(0, NULL);
 }
 
 // TODO Error mklib(Project *p);
