@@ -11,3 +11,7 @@ The project is fairly small and straightforward to compile :
  - Use "make" to get the tbr.elf executable.
  - Use "make install" to install it. Well, that step will only work if you are 
 me for now ... Hopefully I will correct that in the future.
+
+TODO :
+Create a initialization and finalization routine for the tbr.c implementation.
+The use of an hash table to avoid including the same dependancy multiple times does not work, there is a bug somewhere.

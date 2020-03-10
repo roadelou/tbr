@@ -1,12 +1,29 @@
+// Section 0 : Include
 #include "tbr.h"
 
-Error write_file(const char *filename, const char *text);
-int dir_exists(const char *path);
-Error read_tbr(Project *p, const char *filename);
-Error fcopy(const char *src, const char *dest);
-Error make_recur(const Dependancy d);
+// Defined in tbr.h, shared with main.c (for now).
+extern char *TBR_HOME;
 
+// Section 1 : Prototypes and static values
+
+// This implementation uses some helper functions gathered at the end of the
+// file.
+
+// Writes some text to a file create at given path.
+Error write_file(const char *filename, const char *text);
+// Checks whether the dir at path exists.
+int dir_exists(const char *path);
+// Read the .tbr file located at the given path. This does not belong in tbr.h
+// since this should only be called if filename is valid.
+Error read_tbr(Project *p, const char *filename);
+// Copies file from path scr to path dest.
+Error fcopy(const char *src, const char *dest);
+
+// Section 2 : tbr.h implementation
+
+// Creates a new project with given name.
 Error nproj(Project *p, const char *name) {
+  // First thing is to get the current working directory path
   char cwd_buffer[TBR_STR_SIZE];
   char *cwd_ptr = getcwd(cwd_buffer, TBR_STR_SIZE);
   if (cwd_ptr == NULL) {
@@ -33,6 +50,8 @@ Error nproj(Project *p, const char *name) {
     return errorf(-1, "Could not enter directory %s", p->path);
   }
 
+  // Yes, I hard-coded the Makefile. Aside from the obvious, what is wrong with
+  // that ?
   char *makefile_format =
       "# Makefile generated automatically by the tbr tool.\n"
       "NAME = %s\n"
@@ -129,33 +148,6 @@ Error nproj(Project *p, const char *name) {
   return error(0, NULL);
 }
 
-int dir_exists(const char *path) {
-  DIR *dir_ptr = opendir(path);
-  if (dir_ptr) {
-    closedir(dir_ptr);
-    return 1;
-  } else if (ENOENT == errno) {
-    return 0;
-  } else {
-    // i.e. other error
-    return -1;
-  }
-}
-
-Error write_file(const char *filename, const char *text) {
-  FILE *f_ptr = fopen(filename, "w");
-  if (f_ptr == NULL) {
-    return errorf(-1, "Could not create file %s", filename);
-  }
-  // else ...
-  int written = fputs(text, f_ptr);
-  if (written == EOF) {
-    return errorf(-1, "Could not write to file %s", filename);
-  }
-  // else ...
-  return error(0, NULL);
-}
-
 // Reads project in path specified by path. If path is null looks in cwd.
 Error rproj(Project *p, const char *path) {
   if (path == NULL) {
@@ -210,6 +202,199 @@ Error rproj(Project *p, const char *path) {
   return error(0, NULL);
 }
 
+// includes the dependancy d in the .dep folder. Only works for a single
+// dependancy (i.e. this is not recursive, the recursion part is handled
+// elsewhere).
+Error include(const Dependancy d) {
+  // First thing is to test whether d has already been included.
+  ENTRY dep_entry;
+  dep_entry.key = (char *)d.name;
+  dep_entry.data = NULL;
+  ENTRY *found = hsearch(dep_entry, FIND);
+  if (found != NULL) {
+    // Nothing to do, the dependancy is already included.
+    llog("Dependancy %s has been optimized out\n", d.name); // just bragging
+    return error(0, NULL);
+  }
+  // else ...
+  char *depfolder = "./.dep";
+  // First we get the directory where the source files are located.
+  char libpath[TBR_STR_SIZE];
+  snprintf(libpath, TBR_STR_SIZE, "%s/.tbr/%s", TBR_HOME, d.name);
+  DIR *dir_ptr = opendir(libpath);
+  if (dir_ptr == NULL) {
+    return errorf(-1, "Dependancy %s not found in repos", d.name);
+  }
+  // else ...
+
+  // We copy all verilog files from the source archive to the local .dep folder.
+  struct dirent *ent;
+  int found_verilog = 0;
+  while ((ent = readdir(dir_ptr)) != NULL) {
+    // i.e. for all files in dir_ptr.
+    size_t filename_len = strlen(ent->d_name);
+    // We copy all files ending with .v, assumed to be verilog files.
+    int comparison = strncmp(ent->d_name + (filename_len - 2), ".v", 2);
+    if (comparison == 0) {
+      // i.e. found a verilog file.
+      found_verilog++;
+      // Getting source path.
+      char verilog_src[TBR_STR_SIZE];
+      snprintf(verilog_src, TBR_STR_SIZE, "%s/%s", libpath, ent->d_name);
+      // Getting destination path.
+      char verilog_dest[TBR_STR_SIZE];
+      snprintf(verilog_dest, TBR_STR_SIZE, "%s/%s", depfolder, ent->d_name);
+      // Copying the file.
+      Error cpy_error = fcopy(verilog_src, verilog_dest);
+      if (cpy_error.code == -1) {
+        return errorf(-1, "Could not copy source file %s", ent->d_name);
+      }
+    }
+  }
+  if (found_verilog == 0) {
+    return error(-1, "No source found in dep folder");
+  }
+  closedir(dir_ptr);
+
+  // updating dependancy dict
+  dep_entry.key = (char *)d.name;
+  dep_entry.data = NULL;
+  hsearch(dep_entry, ENTER);
+
+  mlog("Included %s\n", d.name);
+
+  return error(0, NULL);
+}
+
+// Fills the p struct with information from the .tbr file of the dependancy d
+Error getdeps(Project *p, const Dependancy d) {
+  char dep_path[TBR_STR_SIZE];
+  snprintf(dep_path, TBR_STR_SIZE, "%s/.tbr/%s", TBR_HOME, d.name);
+  Error read_error = rproj(p, dep_path);
+  if ((read_error.code == 0) || (read_error.code == -3)) {
+    // i.e. looking at dependancy with no other dependancy
+    return error(0, NULL);
+  } else {
+    return errorf(-1, "Could not read tbr file of %s", d.name);
+  }
+}
+
+// Initial iteration of the make_recur from current working directory (reading
+// the .tbr file).
+Error make(void) {
+  Project p;
+  Error read_root = rproj(&p, NULL);
+  if (read_root.code == -1) {
+    return error(-1, "Failed to begin recursive build");
+  }
+
+  mlog("Building project %s\n", p.name);
+
+  for (size_t i = 0; i < p.count; i++) {
+    Error make_err = make_recur(p.deps[i]);
+    if (make_err.code == -1) {
+      return errorf(-1, "Recursive build of %s failed", p.deps[i].name);
+    }
+  }
+  return error(0, NULL);
+}
+
+// Recursively includes d and then all of its sub dependancies.
+Error make_recur(const Dependancy d) {
+  // Note that this first test is usefull to solve issues with circular
+  // dependancies
+  ENTRY dep_entry;
+  dep_entry.key = (char *)d.name;
+  dep_entry.data = NULL;
+  ENTRY *found = hsearch(dep_entry, FIND);
+  if (found != NULL) {
+    // Nothing to do, the dependancy is already included.
+    llog("Dependancy %s has been optimized out\n", d.name); // just bragging
+    return error(0, NULL);
+  }
+  // else ...
+
+  Project p;
+  Error gotten_deps = getdeps(&p, d);
+  if (gotten_deps.code == -1) {
+    return errorf(-1, "Could not get build dependancies of %s", d.name);
+  }
+  // else ...
+  for (size_t i = 0; i < p.count; i++) {
+    Error make_err = make_recur(p.deps[i]);
+    if (make_err.code == -1) {
+      return errorf(-1, "Recursive build of %s failed", p.deps[i].name);
+    }
+  }
+
+  Error included = include(d);
+  if (included.code == -1) {
+    return errorf(-1, "Could not include dependancy %s", d.name);
+  }
+  return error(0, NULL);
+}
+
+// cleans the .dep folder
+Error clean(void) {
+  llog("%s\n", "Cleaning dependancy folder");
+
+  char *depfolder = "./.dep";
+  DIR *dir_ptr = opendir(depfolder);
+  if (dir_ptr == NULL) {
+    return errorf(-1, "Dependancy folder %s could not be opened", depfolder);
+  }
+  // else ...
+
+  struct dirent *ent;
+  while ((ent = readdir(dir_ptr)) != NULL) {
+    // i.e. for file in dir_ptr
+    size_t filename_len = strlen(ent->d_name);
+    int comparison = strncmp(ent->d_name + (filename_len - 2), ".v", 2);
+    if (comparison == 0) {
+      char fname[TBR_STR_SIZE];
+      snprintf(fname, TBR_STR_SIZE, "%s/%s", depfolder, ent->d_name);
+      int removed = remove(fname);
+      if (removed == -1) {
+        return errorf(-1, "Could not remove file %s in .dep folder",
+                      ent->d_name);
+      }
+    }
+  }
+  closedir(dir_ptr);
+  return error(0, NULL);
+}
+
+// Section 3 : Helper functions implementation
+
+int dir_exists(const char *path) {
+  DIR *dir_ptr = opendir(path);
+  if (dir_ptr) {
+    closedir(dir_ptr);
+    return 1;
+  } else if (ENOENT == errno) {
+    return 0;
+  } else {
+    // i.e. other error
+    return -1;
+  }
+}
+
+Error write_file(const char *filename, const char *text) {
+  FILE *f_ptr = fopen(filename, "w");
+  if (f_ptr == NULL) {
+    return errorf(-1, "Could not create file %s", filename);
+  }
+  // else ...
+  int written = fputs(text, f_ptr);
+  if (written == EOF) {
+    return errorf(-1, "Could not write to file %s", filename);
+  }
+  // else ...
+  return error(0, NULL);
+}
+
+// Reads the .tbr file found at path filename line by line to fill the project
+// struct p.
 Error read_tbr(Project *p, const char *filename) {
   // The index used to iterate over deps
   p->count = 0;
@@ -248,56 +433,7 @@ Error read_tbr(Project *p, const char *filename) {
   return error(0, NULL);
 }
 
-Error include(const Dependancy d) {
-  ENTRY dep_entry;
-  dep_entry.key = (char *)d.name;
-  dep_entry.data = NULL;
-  ENTRY *found = hsearch(dep_entry, FIND);
-  if (found != NULL) {
-    // Nothing to do, the dependancy is already included.
-    return error(0, NULL);
-  }
-  // else ...
-  char *depfolder = "./.dep";
-  char libpath[TBR_STR_SIZE];
-  snprintf(libpath, TBR_STR_SIZE, "%s/.tbr/%s", TBR_HOME, d.name);
-  DIR *dir_ptr = opendir(libpath);
-  if (dir_ptr == NULL) {
-    return errorf(-1, "Dependancy %s not found in repos", d.name);
-  }
-  // else ...
-
-  // We copy all verilog files to the local .dep folder.
-  struct dirent *ent;
-  int found_verilog = 0;
-  while ((ent = readdir(dir_ptr)) != NULL) {
-    size_t filename_len = strlen(ent->d_name);
-    int comparison = strncmp(ent->d_name + (filename_len - 2), ".v", 2);
-    if (comparison == 0) {
-      found_verilog++;
-      char verilog_src[TBR_STR_SIZE];
-      snprintf(verilog_src, TBR_STR_SIZE, "%s/%s", libpath, ent->d_name);
-      char verilog_dest[TBR_STR_SIZE];
-      snprintf(verilog_dest, TBR_STR_SIZE, "%s/%s", depfolder, ent->d_name);
-      Error cpy_error = fcopy(verilog_src, verilog_dest);
-      if (cpy_error.code == -1) {
-        return errorf(-1, "Could not copy source file %s", ent->d_name);
-      }
-    }
-  }
-  if (found_verilog == 0) {
-    return error(-1, "No source found in dep folder");
-  }
-  closedir(dir_ptr);
-
-  // updating dependancy dict
-  hsearch(dep_entry, ENTER);
-
-  mlog("Included %s\n", d.name);
-
-  return error(0, NULL);
-}
-
+// Copy file from source to destination.
 Error fcopy(const char *src, const char *dest) {
   FILE *source = fopen(src, "rb");
   if (source == NULL) {
@@ -318,7 +454,7 @@ Error fcopy(const char *src, const char *dest) {
   // else ...
 
   // allocating memory needed to transer the file in one pass (could be improved
-  // later on.
+  // later on).
   void *buffer = malloc(file_size);
   size_t read_src = fread(buffer, 1, file_size, source);
   if (read_src != file_size) {
@@ -334,95 +470,3 @@ Error fcopy(const char *src, const char *dest) {
   fclose(destination);
   return error(0, NULL);
 }
-
-Error getdeps(Project *p, const Dependancy d) {
-  char dep_path[TBR_STR_SIZE];
-  snprintf(dep_path, TBR_STR_SIZE, "%s/.tbr/%s", TBR_HOME, d.name);
-  Error read_error = rproj(p, dep_path);
-  if ((read_error.code == 0) || (read_error.code == -3)) {
-    // i.e. looking at dependancy with no other dependancy
-    return error(0, NULL);
-  } else {
-    return errorf(-1, "Could not read tbr file of %s", d.name);
-  }
-}
-
-Error make(void) {
-  Project p;
-  Error read_root = rproj(&p, NULL);
-  if (read_root.code == -1) {
-    return error(-1, "Failed to begin recursive build");
-  }
-
-  mlog("Building project %s\n", p.name);
-
-  for (size_t i = 0; i < p.count; i++) {
-    Error make_err = make_recur(p.deps[i]);
-    if (make_err.code == -1) {
-      return errorf(-1, "Recursive build of %s failed", p.deps[i].name);
-    }
-  }
-  return error(0, NULL);
-}
-
-Error make_recur(const Dependancy d) {
-  // Note that this test is usefull to solve issues with circular dependancies
-  ENTRY dep_entry;
-  dep_entry.key = (char *)d.name;
-  dep_entry.data = NULL;
-  ENTRY *found = hsearch(dep_entry, FIND);
-  if (found != NULL) {
-    // Nothing to do, the dependancy is already included.
-    return error(0, NULL);
-  }
-  // else ...
-
-  Project p;
-  Error gotten_deps = getdeps(&p, d);
-  if (gotten_deps.code == -1) {
-    return errorf(-1, "Could not get build dependancies of %s", d.name);
-  }
-  // else ...
-  for (size_t i = 0; i < p.count; i++) {
-    Error make_err = make_recur(p.deps[i]);
-    if (make_err.code == -1) {
-      return errorf(-1, "Recursive build of %s failed", p.deps[i].name);
-    }
-  }
-
-  Error included = include(d);
-  if (included.code == -1) {
-    return errorf(-1, "Could not include dependancy %s", d.name);
-  }
-  return error(0, NULL);
-}
-
-extern Error clean(void) {
-  llog("%s\n", "Cleaning dependancy folder");
-
-  char *depfolder = "./.dep";
-  DIR *dir_ptr = opendir(depfolder);
-  if (dir_ptr == NULL) {
-    return errorf(-1, "Dependancy folder %s could not be opened", depfolder);
-  }
-  // else ...
-
-  struct dirent *ent;
-  while ((ent = readdir(dir_ptr)) != NULL) {
-    size_t filename_len = strlen(ent->d_name);
-    int comparison = strncmp(ent->d_name + (filename_len - 2), ".v", 2);
-    if (comparison == 0) {
-      char fname[TBR_STR_SIZE];
-      snprintf(fname, TBR_STR_SIZE, "%s/%s", depfolder, ent->d_name);
-      int removed = remove(fname);
-      if (removed == -1) {
-        return errorf(-1, "Could not remove file %s in .dep folder",
-                      ent->d_name);
-      }
-    }
-  }
-  closedir(dir_ptr);
-  return error(0, NULL);
-}
-
-// TODO Error mklib(Project *p);

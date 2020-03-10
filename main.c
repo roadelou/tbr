@@ -1,19 +1,44 @@
 #include "tbr.h"
 
+// Defined in tbr.h and shared with tbr.c
+extern char *TBR_HOME;
+
+// Contains the main of the program, highly relies on the tbr.c file.
+
+// Those routines are high level wrappers around the tbr.c routines, or just
+// handy functions. prints a message explaining how to use the tbr tool.
 int tbr_usage(const char *reason);
+// Creates a new tbr project of given name in a new subdirectory of the current
+// working folder.
 int tbr_new(const char *name);
+// Builds the project in the current working directory.
 int tbr_build(void);
+// prints a "Unrecognized option <word>" message.
 int tbr_unrecognized(const char *word);
+// Empties the .dep folder in current working directory.
 int tbr_clean(void);
 
+// Main function of the tbr executable, handles user input
 int main(int argc, char *argv[]) {
+  // err_code is the value returned by the main
   int err_code = 0;
+  // default log level is explicitely set to MED (it is also implicitely set to
+  // MED in log.c but that is not obvious.
   loglvl(MED);
+
+  // Step one : create the hash table required by tbr.c to handle dependancies
   int created_dict = hcreate(TBR_DICT_SIZE);
   if (created_dict == 0) {
     puts(strerror(errno));
     err_code = -1;
   }
+
+  // Step two : find home folder
+  TBR_HOME = getenv("HOME");
+
+  // Step three : do your stuff
+
+  // cursor is used to iterate through user input.
   int cursor = 0;
   while ((err_code == 0) && (argc > 1 + cursor++)) {
     const char *cmd = argv[cursor];
@@ -53,10 +78,12 @@ int main(int argc, char *argv[]) {
     tbr_usage("Not enough arguments");
     err_code = -1;
   }
+  // free the hash table used by the program.
   hdestroy();
   return err_code;
 }
 
+// Displays a nice message explaining how to use the tool.
 int tbr_usage(const char *reason) {
   char *usage_msgf =
       "(!) %s\n"
@@ -80,16 +107,21 @@ int tbr_usage(const char *reason) {
   return printf(usage_msgf, reason);
 }
 
+// Creates a new project.
 int tbr_new(const char *name) {
   Project p;
   Error new_error = nproj(&p, name);
   if (new_error.code == -1) {
+    // Note that some error message will be printed because of how error.c was
+    // written.
     return -1;
   } else {
     return 0;
   }
 }
 
+// Builds the project in current working directory. Cleans .dep folder
+// beforehand.
 int tbr_build(void) {
   clean();
   Error make_error = make();
@@ -100,6 +132,7 @@ int tbr_build(void) {
   }
 }
 
+// Prints "Unrecognized option <word>".
 int tbr_unrecognized(const char *word) {
   size_t cmd_len = strlen(word);
   char msg_buffer[cmd_len + 21];
@@ -108,6 +141,7 @@ int tbr_unrecognized(const char *word) {
   return -1;
 }
 
+// Cleans .dep folder in current working directory.
 int tbr_clean(void) {
   clean();
   return 0;
