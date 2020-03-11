@@ -19,6 +19,11 @@
 #define TBR_DICT_SIZE 128
 #endif
 
+// Used to get access to reentrant versions of the hsearch functions
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "error.h"  // used to make erroe handling less painfull
 #include "log.h"    // used for nice log info
 #include <dirent.h> // used to check if directories exist
@@ -57,11 +62,6 @@ struct Project {
   Dependancy deps[TBR_MAX_DEP];
 };
 
-// Used to dynamically set home folder at runtime. Should be improved later on
-// with a library wide setup function. This is a shared value, hence it is not
-// extern.
-char *TBR_HOME;
-
 // Create a non existent project in a subdirectory of the current working
 // directory
 extern Error nproj(Project *p, const char *name);
@@ -75,10 +75,14 @@ extern Error make_recur(const Dependancy d);
 // dep is a single dependancy, whose tbr file will be read and used to complete
 // p by making the necessary inclusions.
 extern Error getdeps(Project *p, const Dependancy d);
-// Includes a single dependancy into the project (copies it to the .dep folder)
+// Includes a single dependancy into the project (copies it to the .dep folder).
 extern Error include(const Dependancy d);
-// Cleans the hidden folders used by tbr in current working directory
+// Cleans the hidden folders used by tbr in current working directory.
 extern Error clean(void);
+// Function that must be called before calling any other function in this library.
+extern Error initialize(void);
+// Funtion to call once you are done using the library to wrap thing up.
+extern Error finalize(void);
 
 // End of once include header guard
 #endif

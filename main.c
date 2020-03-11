@@ -1,9 +1,6 @@
 #include "tbr.h"
 
-// Defined in tbr.h and shared with tbr.c
-extern char *TBR_HOME;
-
-// Contains the main of the program, highly relies on the tbr.c file.
+// Contains the main of the program, highly relies on the tbr.h routines (of course).
 
 // Those routines are high level wrappers around the tbr.c routines, or just
 // handy functions. prints a message explaining how to use the tbr tool.
@@ -22,22 +19,12 @@ int tbr_clean(void);
 int main(int argc, char *argv[]) {
   // err_code is the value returned by the main
   int err_code = 0;
-  // default log level is explicitely set to MED (it is also implicitely set to
-  // MED in log.c but that is not obvious.
-  loglvl(MED);
 
-  // Step one : create the hash table required by tbr.c to handle dependancies
-  int created_dict = hcreate(TBR_DICT_SIZE);
-  if (created_dict == 0) {
-    puts(strerror(errno));
-    err_code = -1;
+  Error initialized = initialize();
+  if (initialized.code == -1) {
+	// Note that because err_code != 0 the main loop will be skipped.
+	err_code = -1;
   }
-
-  // Step two : find home folder
-  TBR_HOME = getenv("HOME");
-
-  // Step three : do your stuff
-
   // cursor is used to iterate through user input.
   int cursor = 0;
   while ((err_code == 0) && (argc > 1 + cursor++)) {
@@ -78,8 +65,10 @@ int main(int argc, char *argv[]) {
     tbr_usage("Not enough arguments");
     err_code = -1;
   }
-  // free the hash table used by the program.
-  hdestroy();
+  Error cleaning = finalize();
+  if (cleaning.code == -1) {
+	err_code = -1;
+  }
   return err_code;
 }
 
