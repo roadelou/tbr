@@ -1,6 +1,7 @@
 #include "tbr.h"
 
-// Contains the main of the program, highly relies on the tbr.h routines (of course).
+// Contains the main of the program, highly relies on the tbr.h routines (of
+// course).
 
 // Those routines are high level wrappers around the tbr.c routines, or just
 // handy functions. prints a message explaining how to use the tbr tool.
@@ -22,8 +23,8 @@ int main(int argc, char *argv[]) {
 
   Error initialized = initialize();
   if (initialized.code == -1) {
-	// Note that because err_code != 0 the main loop will be skipped.
-	err_code = -1;
+    // Note that because err_code != 0 the main loop will be skipped.
+    err_code = -1;
   }
   // cursor is used to iterate through user input.
   int cursor = 0;
@@ -67,7 +68,7 @@ int main(int argc, char *argv[]) {
   }
   Error cleaning = finalize();
   if (cleaning.code == -1) {
-	err_code = -1;
+    err_code = -1;
   }
   return err_code;
 }

@@ -3,7 +3,9 @@
 
 // Determined at runtime with the initialize function.
 static char TBR_HOME[TBR_STR_SIZE];
-// Checked at the beginning of all function to avoid undefined behaviors. The function should panic if INIT_OK is false (unless the routine is initialize, in which case it should panic if INIT_OF is true).
+// Checked at the beginning of all function to avoid undefined behaviors. The
+// function should panic if INIT_OK is false (unless the routine is initialize,
+// in which case it should panic if INIT_OF is true).
 static int INIT_OK = 0;
 // To avoid writing the panick message everytime.
 static char *INIT_ERROR = "The initialize routine hasn't been called";
@@ -12,7 +14,8 @@ static char *INIT_ERROR = "The initialize routine hasn't been called";
 static struct hsearch_data *HTABLE;
 
 // Keeps reference of all malloc'd strings (for the HTABLE keys).
-// Always malloc'd to contain TBR_DICT_SIZE keys of in initialize and freed in finalize.
+// Always malloc'd to contain TBR_DICT_SIZE keys of in initialize and freed in
+// finalize.
 static char **BOOK;
 
 // Used to keep count of all the valid references in BOOK that have to be freed.
@@ -39,7 +42,7 @@ Error fcopy(const char *src, const char *dest);
 Error nproj(Project *p, const char *name) {
   // Check init flag
   if (!INIT_OK) {
-	return error(-1, INIT_ERROR);
+    return error(-1, INIT_ERROR);
   }
   // else ...
 
@@ -172,7 +175,7 @@ Error nproj(Project *p, const char *name) {
 Error rproj(Project *p, const char *path) {
   // Check init flag
   if (!INIT_OK) {
-	return error(-1, INIT_ERROR);
+    return error(-1, INIT_ERROR);
   }
   // else ...
 
@@ -234,7 +237,7 @@ Error rproj(Project *p, const char *path) {
 Error include(const Dependancy d) {
   // Check init flag
   if (!INIT_OK) {
-	return error(-1, INIT_ERROR);
+    return error(-1, INIT_ERROR);
   }
   // else ...
 
@@ -292,10 +295,11 @@ Error include(const Dependancy d) {
   }
   closedir(dir_ptr);
 
-  // updating dependancy dict, but we have to keep a reference somewhere else to free the pointer later on.
-  // Small check for precaution.
+  // updating dependancy dict, but we have to keep a reference somewhere else to
+  // free the pointer later on. Small check for precaution.
   if (BOOK_COUNT == TBR_DICT_SIZE) {
-	return errorf(-1, "Maximum amount of dependancies %d reached", TBR_DICT_SIZE);
+    return errorf(-1, "Maximum amount of dependancies %d reached",
+                  TBR_DICT_SIZE);
   }
   // else ...
 
@@ -303,17 +307,17 @@ Error include(const Dependancy d) {
   dep_entry.key = BOOK[BOOK_COUNT];
   BOOK_COUNT++;
   strncpy(dep_entry.key, d.name, TBR_STR_SIZE);
-  //dep_entry.key = (char *)d.name;
+  // dep_entry.key = (char *)d.name;
   dep_entry.data = NULL;
   ENTRY *entered;
   int entered_code = hsearch_r(dep_entry, ENTER, &entered, HTABLE);
   if (entered_code == 0) {
-	return errorf(-1, "Could not insert %s in hastable", dep_entry.key);
+    return errorf(-1, "Could not insert %s in hastable", dep_entry.key);
   }
   // else ...
 
   mlog("Included %s\n", d.name);
-  
+
   return error(0, NULL);
 }
 
@@ -321,7 +325,7 @@ Error include(const Dependancy d) {
 Error getdeps(Project *p, const Dependancy d) {
   // Check init flag
   if (!INIT_OK) {
-	return error(-1, INIT_ERROR);
+    return error(-1, INIT_ERROR);
   }
   // else ...
 
@@ -341,7 +345,7 @@ Error getdeps(Project *p, const Dependancy d) {
 Error make(void) {
   // Check init flag
   if (!INIT_OK) {
-	return error(-1, INIT_ERROR);
+    return error(-1, INIT_ERROR);
   }
   // else ...
 
@@ -366,7 +370,7 @@ Error make(void) {
 Error make_recur(const Dependancy d) {
   // Check init flag
   if (!INIT_OK) {
-	return error(-1, INIT_ERROR);
+    return error(-1, INIT_ERROR);
   }
   // else ...
 
@@ -408,7 +412,7 @@ Error make_recur(const Dependancy d) {
 Error clean(void) {
   // Check init flag
   if (!INIT_OK) {
-	return error(-1, INIT_ERROR);
+    return error(-1, INIT_ERROR);
   }
   // else ...
 
@@ -443,11 +447,13 @@ Error clean(void) {
 Error initialize(void) {
   // Check init flag
   if (INIT_OK) {
-	return error(-1, "Initialize function has already been called");
+    return error(-1, "Initialize function has already been called");
   }
   // else ...
 
-  // default log level is explicitely set to MED (it is also implicitely set to MED in log.c but that is not as obvious and depends on the implementation of log.
+  // default log level is explicitely set to MED (it is also implicitely set to
+  // MED in log.c but that is not as obvious and depends on the implementation
+  // of log.
   loglvl(MED);
 
   // Step zero : malloc the hash table.
@@ -464,7 +470,8 @@ Error initialize(void) {
   // Step two : find home folder.
   strncpy(TBR_HOME, getenv("HOME"), TBR_STR_SIZE);
 
-  // Step three : malloc the BOOK refence keeper and initialize reference counter.
+  // Step three : malloc the BOOK refence keeper and initialize reference
+  // counter.
   BOOK = malloc(TBR_DICT_SIZE * sizeof(char *));
   BOOK_COUNT = 0;
 
@@ -476,7 +483,7 @@ Error initialize(void) {
 Error finalize(void) {
   // Check init flag
   if (!INIT_OK) {
-	return error(-1, INIT_ERROR);
+    return error(-1, INIT_ERROR);
   }
   // else ...
 
@@ -485,8 +492,8 @@ Error finalize(void) {
 
   // Free all the keys that were used in the hash table.
   for (size_t i = 0; i < BOOK_COUNT; i++) {
-	char *ref = BOOK[i];
-	free(ref);
+    char *ref = BOOK[i];
+    free(ref);
   }
   BOOK_COUNT = 0;
 
@@ -586,8 +593,8 @@ Error fcopy(const char *src, const char *dest) {
   }
   // else ...
 
-  // allocating memory needed to transfer the file in one pass (could be improved
-  // later on).
+  // allocating memory needed to transfer the file in one pass (could be
+  // improved later on).
   void *buffer = malloc(file_size);
   size_t read_src = fread(buffer, 1, file_size, source);
   if (read_src != file_size) {

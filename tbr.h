@@ -79,7 +79,8 @@ extern Error getdeps(Project *p, const Dependancy d);
 extern Error include(const Dependancy d);
 // Cleans the hidden folders used by tbr in current working directory.
 extern Error clean(void);
-// Function that must be called before calling any other function in this library.
+// Function that must be called before calling any other function in this
+// library.
 extern Error initialize(void);
 // Funtion to call once you are done using the library to wrap thing up.
 extern Error finalize(void);
