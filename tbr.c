@@ -90,6 +90,7 @@ Error nproj(Project *p, const char *name) {
       "# The global location where all librairies are stored, used by the tbr "
       "tool to gather the dependancies of your project.\n"
       "LIB = %s/.tbr\n"
+	  ".PHONY: deps, install, clean\n"
       "\n"
       "top: $(SRC) deps $(TOP)\n"
       "\tiverilog -o top $(SRC) $(DEP) $(TOP)\n"
